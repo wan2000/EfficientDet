@@ -113,3 +113,4 @@ tests/
 *test-dev*
 val2017*
 *.txt
+saved_models/
