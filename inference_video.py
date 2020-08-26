@@ -13,9 +13,10 @@ from utils.draw_boxes import draw_boxes
 def main():
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-    phi = 1
+    phi = 2
     weighted_bifpn = True
-    model_path = 'd1.h5'
+    # model_path = 'd1.h5'
+    model_path = 'saved_models/efficientdet-d{}.h5'.format(phi)
     image_sizes = (512, 640, 768, 896, 1024, 1280, 1408)
     image_size = image_sizes[phi]
     # coco classes
@@ -29,7 +30,8 @@ def main():
                             score_threshold=score_threshold)
     model.load_weights(model_path, by_name=True)
 
-    video_path = 'datasets/video.mp4'
+    # video_path = 'datasets/video.mp4'
+    video_path = 'datasets/cam_01.mp4'
     cap = cv2.VideoCapture(video_path)
 
     while True:
@@ -60,7 +62,8 @@ def main():
 
         cv2.namedWindow('image', cv2.WINDOW_NORMAL)
         cv2.imshow('image', src_image)
-        cv2.waitKey(0)
+        if cv2.waitKey(1) == 27:
+            break
 
 
 if __name__ == '__main__':

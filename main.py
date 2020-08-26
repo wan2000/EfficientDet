@@ -7,6 +7,9 @@ import json
 
 from model import efficientdet
 
+from utils import preprocess_image, postprocess_boxes
+from utils.draw_boxes import draw_boxes
+
 label = {
     1 : 'bicycle',
     2 : 'car',
@@ -24,17 +27,26 @@ label_color = {
 }
 
 phi = 4
+image_sizes = (512, 640, 768, 896, 1024, 1280, 1408)
+focus_classes = (1, 2, 3, 5, 7)
+image_size = image_sizes[phi]
 
 model, prediction_model = efficientdet(phi=phi, num_classes=90, weighted_bifpn=True, score_threshold=0.01)
 prediction_model.load_weights('saved_models/efficientdet-d{}.h5'.format(phi), by_name=True)
 prediction_model.summary()
 input_shape = prediction_model.input.shape
 
+score_threshold = 0.3
+
 cam_num = 'cam_01'
 
 f = json.load(open('datasets/{}.json'.format(cam_num)))
 zone = f['shapes'][0]['points']
 zone = np.array(zone, np.int32)
+
+num_classes = 90
+classes = {value['id'] - 1: value['name'] for value in json.load(open('coco_90.json', 'r')).values()}
+colors = [np.random.randint(0, 256, 3).tolist() for _ in range(num_classes)]
 
 cap = cv2.VideoCapture('datasets/{}.mp4'.format(cam_num))
 while cap.isOpened():
@@ -43,18 +55,34 @@ while cap.isOpened():
     dst = frame.copy()
     dst = cv2.polylines(dst, [zone], True, (127,127,127), 5)
 
-    np_input = cv2.resize(frame, (input_shape[1], input_shape[2]))
+    frame = frame[:, :, ::-1]
+    h, w = frame.shape[:2]
 
-    boxes, scores, labels = prediction_model.predict(np.expand_dims(np_input, axis=0) / 255.)
-    for i, bb in enumerate(boxes[0]):
-        lab = labels[0][i]
-        if lab == 1 or lab == 2 or lab == 3 or lab == 5 or lab == 7:
-            bb = np.array(bb, np.int32)
-            bb[0] = bb[0] / np_input.shape[1] * dst.shape[1]
-            bb[1] = bb[1] / np_input.shape[0] * dst.shape[0]
-            bb[2] = bb[2] / np_input.shape[1] * dst.shape[1]
-            bb[3] = bb[3] / np_input.shape[0] * dst.shape[0]
-            dst = cv2.rectangle(dst, (bb[0], bb[1]), (bb[2], bb[3]), label_color[lab], 3)
+    image, scale = preprocess_image(frame, image_size=image_size)
+
+    boxes, scores, labels = prediction_model.predict([np.expand_dims(image, axis=0)])
+    boxes, scores, labels = np.squeeze(boxes), np.squeeze(scores), np.squeeze(labels)
+    boxes = postprocess_boxes(boxes=boxes, scale=scale, height=h, width=w)
+
+    # select indices which have a score above the threshold
+    indices = np.where(scores[:] > score_threshold)[0]
+    
+
+    # select those detections
+    boxes = boxes[indices]
+    labels = labels[indices]
+    scores = scores[indices]
+
+    indices = np.array([], np.int64)
+
+    for i in focus_classes:
+        indices = np.concatenate([indices,np.where(labels == i)[0]])
+
+    boxes = boxes[indices]
+    labels = labels[indices]
+    scores = scores[indices]
+
+    draw_boxes(dst, boxes, scores, labels, colors, classes)
 
     cv2.imshow('', dst)
 
