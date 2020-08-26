@@ -34,11 +34,10 @@ image_size = image_sizes[phi]
 model, prediction_model = efficientdet(phi=phi, num_classes=90, weighted_bifpn=True, score_threshold=0.01)
 prediction_model.load_weights('saved_models/efficientdet-d{}.h5'.format(phi), by_name=True)
 prediction_model.summary()
-input_shape = prediction_model.input.shape
 
 score_threshold = 0.3
 
-cam_num = 'cam_01'
+cam_num = 'cam_02'
 
 f = json.load(open('datasets/{}.json'.format(cam_num)))
 zone = f['shapes'][0]['points']
